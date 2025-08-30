@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Feedback Dashboard</title>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg: #0f172a; /* slate-900 */
+            --panel: #111827; /* gray-900 */
+            --muted: #94a3b8; /* slate-400 */
+            --text: #e2e8f0; /* slate-200 */
+            --accent: #22d3ee; /* cyan-400 */
+            --accent-2: #a78bfa; /* violet-400 */
+            --danger: #f87171; /* red-400 */
+            --ok: #34d399; /* emerald-400 */
+            --card: #0b1220; /* slightly darker */
+            --border: #1f2937; /* gray-800 */
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: radial-gradient(1200px 600px at 80% -10%, #1f2937, #0b1220 42%, #0f172a 60%); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+        a { color: var(--accent); }
+
+        .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+        .card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00)); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+        .panel { background: var(--panel); }
+        .card-pad { padding: 20px; }
+
+        .title { font-size: clamp(18px, 2.5vw, 28px); font-weight: 700; letter-spacing: .2px; }
+        .subtitle { color: var(--muted); font-size: 14px; }
+
+        .grid { display: grid; gap: 16px; }
+        .grid-2 { grid-template-columns: 1fr; }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .grid-4 { grid-template-columns: repeat(4, 1fr); }
+        @media (min-width: 900px){ .grid-2 { grid-template-columns: 1.2fr .8fr; } }
+
+        .btn { appearance: none; border: 1px solid var(--border); background: linear-gradient(180deg, #0b1220, #0f172a); color: var(--text); padding: 10px 14px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: transform .06s ease, box-shadow .2s ease, border-color .2s ease; }
+        .btn:hover { border-color: #334155; box-shadow: 0 6px 18px rgba(2, 132, 199, .15); }
+        .btn:active { transform: translateY(1px); }
+        .btn-primary { background: linear-gradient(180deg, rgba(34,211,238,.18), rgba(167,139,250,.14)); border: 1px solid #2a3344; }
+
+        .input { width: 100%; padding: 10px 12px; background: #0a1020; color: var(--text); border: 1px solid var(--border); border-radius: 12px; outline: none; font-size: 14px; }
+        .input:focus { border-color: #334155; box-shadow: 0 0 0 4px rgba(34,211,238,.08); }
+        .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: block; }
+
+        .row { display:flex; gap:10px; align-items:center; }
+
+        .hidden { display: none !important; }
+
+        header { display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 18px; }
+        header .brand { display:flex; align-items:center; gap:12px; }
+        .logo { width: 36px; height: 36px; border-radius: 12px; background: radial-gradient(120% 120% at 10% 10%, var(--accent), var(--accent-2)); box-shadow: 0 10px 24px rgba(34,211,238,.22), inset 0 0 20px rgba(255,255,255,.05); }
+
+        .stat-card { padding: 16px; border-radius: 16px; border:1px solid var(--border); background: #0a0f1c; display:flex; flex-direction:column; gap:8px; }
+        .stat-value { font-size: 28px; font-weight: 800; }
+        .stat-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border-bottom: 1px solid var(--border); padding: 10px 8px; text-align: left; font-size: 14px; }
+        th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .6px; }
+        tbody tr:hover { background: rgba(255,255,255,.02); }
+        .badge { display:inline-flex; align-items:center; gap:6px; padding: 4px 8px; border-radius:999px; font-size:12px; border:1px solid var(--border); background: #0b1426; }
+
+        .footer { color: var(--muted); font-size: 12px; text-align:center; margin-top: 20px; }
+
+        .spinner { width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.15); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Login screen */
+        #login-screen { min-height: 100dvh; display:grid; place-items:center; padding: 24px; }
+        .login-card { width: min(520px, 100%); }
+
+        .help { color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+        /* Simple toast */
+        #toast { position: fixed; right: 16px; bottom: 16px; background:#0b1323; border:1px solid var(--border); color:var(--text); padding: 10px 12px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.35); display:none; }
+
+
+        canvas {display: block;  width: 100% !important; height: auto !important;}
+
+        /* canvas container styling for Chart.js */
+        .chart-card { margin-top: 14px; padding: 12px; border-radius: 12px; border:1px dashed var(--border); background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent); }
+    </style>
+</head>
+<body>
+<!-- Login Screen -->
+<section id="login-screen">
+    <div class="card login-card card-pad">
+        <div class="row" style="justify-content:space-between; margin-bottom:12px;">
+            <div class="brand"><div class="logo"></div><div>
+                <div class="title">Connexion à l'API Feedback</div>
+                <div class="subtitle">Saisissez l'URL de l'API et vos identifiants (Basic Auth)</div>
+            </div></div>
+        </div>
+
+        <div class="grid" style="gap:12px;">
+            <div>
+                <label class="label" for="baseUrl">URL de base de l'API</label>
+                <input class="input" id="baseUrl" placeholder="https://exemple.com" />
+                <div class="help">Les routes utilisées : <code>/api/feedbacks</code>, <code>/api/feedbacks/stat</code> et <code>/api/feedbacks/stats/history</code></div>
+            </div>
+            <div class="grid" style="grid-template-columns:1fr 1fr; gap:12px;">
+                <div>
+                    <label class="label" for="username">Utilisateur</label>
+                    <input class="input" id="username" placeholder="john" />
+                </div>
+                <div>
+                    <label class="label" for="password">Mot de passe</label>
+                    <input class="input" id="password" type="password" placeholder="••••••" />
+                </div>
+            </div>
+            <div class="row" style="justify-content:space-between;">
+                <label class="row" style="gap:8px; color:var(--muted); font-size:13px;">
+                    <input type="checkbox" id="remember" /> Se souvenir (localStorage)
+                </label>
+                <button id="loginBtn" class="btn btn-primary">Se connecter</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- App Screen -->
+<section id="app-screen" class="hidden">
+    <div class="container">
+        <header>
+            <div class="brand">
+                <div class="logo"></div>
+                <div>
+                    <div class="title">Dashboard Feedback</div>
+                    <div class="subtitle" id="apiLabel">Connecté à …</div>
+                </div>
+            </div>
+            <div class="row">
+                <button id="logoutBtn" class="btn" title="Déconnexion">Déconnexion</button>
+            </div>
+        </header>
+
+        <div class="grid grid-2">
+            <!-- Left: Stats + Table -->
+            <div class="grid" style="gap:16px;">
+                <div class="card card-pad">
+                    <div class="row" style="justify-content:space-between; align-items:flex-end; margin-bottom:10px;">
+                        <div>
+                            <div class="title" style="font-size:22px;">Statistiques globales</div>
+                            <div class="subtitle">Nombre total, moyenne, récents (≤90 jours), avec commentaire</div>
+                        </div>
+                        <div class="row" id="statsLoader" style="gap:8px; display:none;">
+                            <div class="spinner"></div>
+                            <span class="subtitle">Chargement…</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-4" id="statsCards" style="gap:12px;">
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-total">–</div>
+                            <div class="stat-label">Total</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-avg">–</div>
+                            <div class="stat-label">Note moyenne</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-recent">–</div>
+                            <div class="stat-label">Récents (≤90j)</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-comment">–</div>
+                            <div class="stat-label">Avec commentaire</div>
+                        </div>
+                    </div>
+
+                    <div class="card chart-card" style="margin-top:14px;">
+                        <canvas id="statsChart" height="120"></canvas>
+                    </div>
+
+                    <!-- === Nouveau: Chart.js history === -->
+                    <div class="card chart-card">
+                        <div class="title" style="font-size:16px; margin-bottom:8px;">Historique des stats (Chart.js)</div>
+                        <canvas id="historyChart" height="180"></canvas>
+                    </div>
+                </div>
+
+                <div class="card card-pad">
+                    <div class="row" style="justify-content:space-between; align-items:flex-end; margin-bottom:8px; flex-wrap:wrap; gap:12px;">
+                        <div class="title" style="font-size:22px;">Feedbacks</div>
+                        <div class="row" style="gap:8px; flex-wrap: wrap;">
+                            <select class="input" id="timeFilter" style="width:150px;">
+                                <option value="">Période: toutes</option>
+                                <option value="24h">Dernières 24h</option>
+                                <option value="7d">7 derniers jours</option>
+                                <option value="30d">30 jours</option>
+                                <option value="90d">90 jours</option>
+                            </select>
+                            <select class="input" id="categoryFilter" style="width:220px;">
+                                <option value="">Catégorie: toutes</option>
+                                <option>generale</option>
+                                <option>navigation</option>
+                                <option>accessibility</option>
+                                <option>speech_synthesis</option>
+                                <option>bug_report</option>
+                            </select>
+                            <button id="refreshBtn" class="btn btn-primary">Actualiser</button>
+                            <div class="row" id="listLoader" style="gap:8px; display:none;">
+                                <div class="spinner"></div>
+                                <span class="subtitle">Chargement…</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="overflow:auto;">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>Note</th>
+                                <th>Catégorie</th>
+                                <th>Contexte</th>
+                                <th>Commentaire</th>
+                                <th>Plateforme</th>
+                                <th>Version</th>
+                                <th>Horodatage</th>
+                            </tr>
+                            </thead>
+                            <tbody id="feedbackBody">
+                            <!-- rows injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Request playground / info -->
+            <aside class="card card-pad">
+                <div class="title" style="font-size:20px; margin-bottom:8px;">Playground d'appel API</div>
+                <div class="subtitle" style="margin-bottom:12px;">Testez rapidement les routes avec vos en-têtes Basic.</div>
+
+                <div class="grid" style="gap:10px;">
+                    <div>
+                        <label class="label">Endpoint relatif</label>
+                        <input class="input" id="playEndpoint" value="/api/feedbacks" />
+                    </div>
+                    <div>
+                        <label class="label">Méthode</label>
+                        <select class="input" id="playMethod">
+                            <option>GET</option>
+                            <option>POST</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label">Corps (JSON)</label>
+                        <textarea class="input" id="playBody" rows="6" placeholder='{"rating":5,"category":"generale","context":"…","timestamp":"2025-08-23T12:30:00Z"}'></textarea>
+                        <div class="help">Laissez vide pour GET. Respectez le schéma si vous postez un feedback.</div>
+                    </div>
+                    <div class="row" style="justify-content:space-between;">
+                        <button id="playSend" class="btn btn-primary">Envoyer</button>
+                        <div class="row" id="playLoader" style="gap:8px; display:none;">
+                            <div class="spinner"></div><span class="subtitle">Requête…</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label">Réponse</label>
+                        <pre id="playResp" class="card" style="padding:12px; overflow:auto; max-height:260px; background:#050a16; border:1px solid var(--border);"></pre>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <div class="footer">Construit pour l'API Feedback · Basic Auth · © 2025</div>
+    </div>
+</section>
+
+<div id="toast"></div>
+
+<script>
+    // ——— Utilities ———
+    const $ = (sel) => document.querySelector(sel);
+    const show = (el, v=true) => (el.style.display = v ? '' : 'none');
+
+    const state = {
+        baseUrl: '',
+        username: '',
+        password: '',
+        get authHeader(){ return 'Basic ' + btoa(`${this.username}:${this.password}`); }
+    };
+
+    function toast(msg, ms=2600){
+        const t = $('#toast');
+        t.textContent = msg; t.style.display = 'block';
+        setTimeout(()=>{ t.style.display='none'; }, ms);
+    }
+
+    function saveOrClearRemember(){
+        if($('#remember').checked){
+            localStorage.setItem('fb_baseUrl', state.baseUrl);
+            localStorage.setItem('fb_user', state.username);
+        } else {
+            localStorage.removeItem('fb_baseUrl');
+            localStorage.removeItem('fb_user');
+        }
+    }
+
+    // Try load remembered
+    (function(){
+        const b = localStorage.getItem('fb_baseUrl');
+        const u = localStorage.getItem('fb_user');
+        if(b) $('#baseUrl').value = b;
+        if(u) $('#username').value = u;
+    })();
+
+    // Chart.js instances holders
+    let historyChartInstance = null;
+
+    // ——— Auth / Login ———
+    async function doLogin(){
+        state.baseUrl = ($('#baseUrl').value || '').replace(/\/$/, '');
+        state.username = $('#username').value.trim();
+        state.password = $('#password').value;
+        if(!state.baseUrl || !state.username || !state.password){
+            toast('Veuillez remplir URL, utilisateur et mot de passe.');
+            return;
+        }
+        saveOrClearRemember();
+
+        // Ping stats to validate credentials
+        try {
+            show($('#statsLoader'), true);
+            const r = await fetch(state.baseUrl + '/api/feedbacks/stat', {
+                headers: { 'Authorization': state.authHeader }
+            });
+            if(!r.ok){ throw new Error('HTTP ' + r.status); }
+            const json = await r.json();
+            $('#apiLabel').textContent = `Connecté à ${state.baseUrl}`;
+            $('#login-screen').classList.add('hidden');
+            $('#app-screen').classList.remove('hidden');
+            renderStats(json);
+            drawChartFromStats(json);
+            await loadFeedbacks();
+            await loadHistory(); // CHARGER l'historique Chart.js ici
+            toast('Connecté.');
+        } catch (e) {
+            console.error(e);
+            toast('Connexion échouée. Vérifiez URL / identifiants / CORS.');
+            show($('#statsLoader'), false);
+        }
+    }
+
+    $('#loginBtn').addEventListener('click', doLogin);
+    document.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter' && !$('#app-screen').classList.contains('hidden')) return;
+        if(e.key === 'Enter' && !$('#login-screen').classList.contains('hidden')) doLogin();
+    });
+
+    $('#logoutBtn').addEventListener('click', ()=>{
+        state.baseUrl = state.username = state.password = '';
+        $('#password').value = '';
+        $('#app-screen').classList.add('hidden');
+        $('#login-screen').classList.remove('hidden');
+    });
+
+    // ——— Stats ———
+    function renderStats(s){
+        $('#stat-total').textContent = s.totalFeedbacks ?? s.total ?? '–';
+        $('#stat-avg').textContent = (s.averageRating != null ? s.averageRating : (s.avgRating != null ? s.avgRating : '–'));
+        $('#stat-recent').textContent = s.recentFeedbacks ?? '–';
+        $('#stat-comment').textContent = s.withComment ?? '–';
+        show($('#statsLoader'), false);
+    }
+
+    function drawChartFromStats(s){
+        const c = $('#statsChart');
+        const ctx = c.getContext('2d');
+        const w = c.width = c.clientWidth; const h = c.height = 140;
+        ctx.clearRect(0,0,w,h);
+        const items = [
+            {label:'Total', value: s.totalFeedbacks||s.total||0},
+            {label:'Récents', value: s.recentFeedbacks||0},
+            {label:'Avec comm.', value: s.withComment||0},
+            {label:'Note x100', value: (s.averageRating||s.avgRating||0)*100/5}
+        ];
+        const max = Math.max(1, ...items.map(i=>i.value));
+        const barW = Math.min(160, (w-40)/items.length - 10);
+        const ox = 20; const baseY = h-26;
+        ctx.font = '12px ui-sans-serif, system-ui';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('Répartition rapide', 10, 14);
+        items.forEach((it, idx)=>{
+            const x = ox + idx * (barW + 24);
+            const height = Math.max(4, (it.value / max) * (h-60));
+            const y = baseY - height;
+            // bar
+            const grad = ctx.createLinearGradient(0, y, 0, y+height);
+            grad.addColorStop(0, 'rgba(34,211,238,.9)');
+            grad.addColorStop(1, 'rgba(167,139,250,.65)');
+            ctx.fillStyle = grad;
+            const radius = 8;
+            roundRect(ctx, x, y, barW, height, radius);
+            ctx.fill();
+            // value
+            ctx.fillStyle = '#e2e8f0';
+            ctx.font = 'bold 13px ui-sans-serif, system-ui';
+            ctx.fillText(String(Math.round(it.value)), x, y-6);
+            // label
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '12px ui-sans-serif, system-ui';
+            ctx.fillText(it.label, x, baseY+16);
+        });
+
+        function roundRect(ctx,x,y,w,h,r){
+            ctx.beginPath();
+            ctx.moveTo(x+r,y);
+            ctx.arcTo(x+w,y,x+w,y+h,r);
+            ctx.arcTo(x+w,y+h,x,y+h,r);
+            ctx.arcTo(x,y+h,x,y,r);
+            ctx.arcTo(x,y,x+w,y,r);
+            ctx.closePath();
+        }
+    }
+
+    // ——— List feedbacks ———
+    async function loadFeedbacks(){
+        try {
+            show($('#listLoader'), true);
+            const params = new URLSearchParams();
+            const t = $('#timeFilter').value; if(t) params.set('time', t);
+            const c = $('#categoryFilter').value; if(c) params.set('category', c);
+            const url = state.baseUrl + '/api/feedbacks' + (params.toString()? ('?'+params.toString()):'');
+            const r = await fetch(url, { headers: { 'Authorization': state.authHeader } });
+            if(!r.ok) throw new Error('HTTP ' + r.status);
+            const list = await r.json();
+            renderTable(list);
+            show($('#listLoader'), false);
+        } catch(e){
+            console.error(e);
+            toast('Échec de chargement des feedbacks.');
+            show($('#listLoader'), false);
+        }
+    }
+
+    function renderTable(list){
+        const tbody = $('#feedbackBody');
+        tbody.innerHTML = '';
+        if(!Array.isArray(list) || !list.length){
+            const tr = document.createElement('tr');
+            const td = document.createElement('td');
+            td.colSpan = 7; td.style.color = 'var(--muted)'; td.textContent = 'Aucun feedback';
+            tr.appendChild(td); tbody.appendChild(tr); return;
+        }
+        const fmt = (s)=> s==null? '—' : String(s);
+        list.forEach(f=>{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+          <td><span class="badge">⭐ ${fmt(f.rating)}</span></td>
+          <td><span class="badge">${fmt(f.category)}</span></td>
+          <td>${fmt(f.context)}</td>
+          <td>${fmt(f.comment)}</td>
+          <td>${fmt((f.platform || (f.deviceInfo && f.deviceInfo.platform)))}</td>
+          <td>${fmt(f.appVersion || (f.deviceInfo && f.deviceInfo.version))}</td>
+          <td>${fmt(new Date(f.timestamp).toLocaleString())}</td>
+        `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    $('#refreshBtn').addEventListener('click', async ()=>{
+        await Promise.all([
+            (async()=>{ // refresh stats
+                try {
+                    show($('#statsLoader'), true);
+                    const r = await fetch(state.baseUrl + '/api/feedbacks/stat', { headers: { 'Authorization': state.authHeader } });
+                    if(!r.ok) throw new Error('HTTP ' + r.status);
+                    const json = await r.json();
+                    renderStats(json); drawChartFromStats(json);
+                } catch(e){ toast('Impossible d\'actualiser les stats.'); }
+                finally { show($('#statsLoader'), false); }
+            })(),
+            loadFeedbacks(),
+            loadHistory()
+        ]);
+        toast('Données actualisées');
+    });
+
+    // ——— Playground ———
+    $('#playSend').addEventListener('click', async ()=>{
+        const method = $('#playMethod').value;
+        const endpoint = $('#playEndpoint').value || '/api/feedbacks';
+        const url = state.baseUrl + endpoint;
+        const init = { method, headers: { 'Authorization': state.authHeader } };
+        if(method === 'POST'){
+            init.headers['Content-Type'] = 'application/json';
+            try { init.body = JSON.stringify(JSON.parse($('#playBody').value || '{}')); }
+            catch { toast('JSON invalide.'); return; }
+        }
+        show($('#playLoader'), true);
+        $('#playResp').textContent = '';
+        try {
+            const r = await fetch(url, init);
+            const text = await r.text();
+            $('#playResp').textContent = `HTTP ${r.status}\n\n` + (pretty(text) || text);
+        } catch(e){
+            $('#playResp').textContent = 'Erreur: ' + e.message;
+        } finally {
+            show($('#playLoader'), false);
+        }
+        function pretty(t){ try { return JSON.stringify(JSON.parse(t), null, 2); } catch { return null; } }
+    });
+
+    // ——— Chart.js : load history and render ———
+    async function loadHistory(){
+        try {
+            const r = await fetch(state.baseUrl + '/api/feedbacks/stats/history', { headers: { 'Authorization': state.authHeader } });
+            if(!r.ok){ throw new Error('HTTP ' + r.status); }
+            const data = await r.json();
+            // Ensure data is an array sorted by date asc
+            if(!Array.isArray(data) || data.length === 0){
+                if(historyChartInstance){ historyChartInstance.destroy(); historyChartInstance = null; }
+                return;
+            }
+            const sorted = data.slice().sort((a,b)=>{
+                const da = new Date(a.date || a._id || a.createdAt || a.timestamp);
+                const db = new Date(b.date || b._id || b.createdAt || b.timestamp);
+                return da - db;
+            });
+            const labels = sorted.map(d => {
+                const dt = new Date(d.date || d._id || d.createdAt || d.timestamp);
+                return dt.toLocaleDateString();
+            });
+            const totals = sorted.map(d => d.totalFeedbacks ?? d.total ?? d.count ?? 0);
+            const avgs = sorted.map(d => (d.averageRating ?? d.avgRating ?? d.avg ?? null));
+
+            // destroy previous chart if exists
+            if(historyChartInstance){ historyChartInstance.destroy(); historyChartInstance = null; }
+
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            historyChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Total feedbacks',
+                            data: totals,
+                            borderColor: 'rgba(34,211,238,0.95)',
+                            backgroundColor: 'rgba(34,211,238,0.08)',
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Note moyenne',
+                            data: avgs,
+                            borderColor: 'rgba(167,139,250,0.95)',
+                            backgroundColor: 'rgba(167,139,250,0.06)',
+                            yAxisID: 'y1',
+                            tension: 0.2,
+                            pointRadius: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    stacked: false,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            beginAtZero: true,
+                            title: { display: true, text: 'Total' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Note moyenne' }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top' }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Erreur chargement historique', e);
+            toast('Impossible de charger l\'historique des stats.');
+        }
+    }
+</script>
+</body>
+</html>
