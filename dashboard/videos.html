@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gestion des vidéos</title>
+
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #111827;
+            --muted: #94a3b8;
+            --text: #e2e8f0;
+            --accent: #22d3ee;
+            --accent-2: #a78bfa;
+            --danger: #f87171;
+            --ok: #34d399;
+            --border: #1f2937;
+        }
+        body {
+            margin: 0; background: var(--bg); color: var(--text);
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+        .title { font-size: 26px; font-weight: 700; margin-bottom: 20px; }
+        .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .input { width: 100%; padding: 10px; background: #0a1020; color: var(--text); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; }
+        .btn { border: none; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: var(--accent); color: black; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-secondary { background: var(--accent-2); color: white; }
+        .video-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); }
+        .video-info { display: flex; flex-direction: column; }
+        .video-actions button { margin-left: 8px; }
+        .link { color: var(--accent); text-decoration: none; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="title">Gestion des vidéos</div>
+
+    <!-- Upload Form -->
+    <div class="card">
+        <h3>Ajouter une vidéo</h3>
+        <input type="file" id="videoFile" class="input" />
+        <input type="text" id="videoDesc" class="input" placeholder="Description (optionnelle)" />
+        <button class="btn btn-primary" onclick="uploadVideo()">Uploader</button>
+    </div>
+
+    <!-- Video List -->
+    <div class="card">
+        <h3>Liste des vidéos</h3>
+        <div id="videoList">Chargement...</div>
+    </div>
+</div>
+
+<script>
+    const API_BASE = 'http://localhost:3000'; // <-- Mets ton URL backend ici
+
+    async function loadVideos(){
+        const res = await fetch(API_BASE + '/api/videos');
+        const videos = await res.json();
+        const container = document.getElementById('videoList');
+        container.innerHTML = '';
+
+        if(videos.length === 0){
+            container.innerHTML = '<p style="color:var(--muted);">Aucune vidéo</p>';
+            return;
+        }
+
+        videos.forEach(v => {
+            const div = document.createElement('div');
+            div.className = 'video-row';
+            div.innerHTML = `
+            <div class="video-info">
+                <strong>${v.filename}</strong>
+                <span>${v.description || 'Aucune description'}</span>
+                <a class="link" href="${v.url}" target="_blank">Ouvrir la vidéo</a>
+            </div>
+            <div class="video-actions">
+                <button class="btn btn-secondary" onclick="editDescription('${v.id}')">Modifier</button>
+                <button class="btn btn-danger" onclick="deleteVideo('${v.id}')">Supprimer</button>
+            </div>
+        `;
+            container.appendChild(div);
+        });
+    }
+
+    async function uploadVideo(){
+        const file = document.getElementById('videoFile').files[0];
+        const description = document.getElementById('videoDesc').value;
+        if(!file){ alert('Veuillez sélectionner un fichier'); return; }
+
+        const formData = new FormData();
+        formData.append('video', file);
+        formData.append('description', description);
+
+        const res = await fetch(API_BASE + '/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        if(res.ok){
+            alert('Vidéo uploadée');
+            document.getElementById('videoFile').value = '';
+            document.getElementById('videoDesc').value = '';
+            loadVideos();
+        } else {
+            alert('Erreur upload');
+        }
+    }
+
+    async function deleteVideo(id){
+        if(!confirm('Supprimer cette vidéo ?')) return;
+        const res = await fetch(API_BASE + '/api/videos/' + id, { method: 'DELETE' });
+        if(res.ok){
+            alert('Vidéo supprimée');
+            loadVideos();
+        } else {
+            alert('Erreur suppression');
+        }
+    }
+
+    async function editDescription(id){
+        const newDesc = prompt('Nouvelle description :');
+        if(newDesc === null) return;
+        const res = await fetch(API_BASE + '/api/videos/' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ description: newDesc })
+        });
+        if(res.ok){
+            alert('Description mise à jour');
+            loadVideos();
+        } else {
+            alert('Erreur mise à jour');
+        }
+    }
+
+    loadVideos();
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  # Backend Node.js
+  video-backend:
+    build: ./backend
+    container_name: video-backend
+    volumes:
+      - ./videos:/app/videos
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+
+  # Dashboard + Reverse Proxy NGINX
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-dashboard
+    depends_on:
+      - video-backend
+    ports:
+      - "80:80"
+    volumes:
+      - ./dashboard:/usr/share/nginx/html:ro
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
