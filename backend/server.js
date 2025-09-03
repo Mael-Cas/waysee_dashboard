@@ -51,7 +51,8 @@ app.get("/api/videos", (req, res) => {
 
     const formattedVideos = metadata.map((v, index) => ({
         id: v.id,
-        title: path.parse(v.filename).name, // nom du fichier sans extension
+        filename: path.parse(v.filename).name, // nom du fichier sans extension
+        title: v.title,
         subtitle: v.subtitle || "Découvrez nos fonctionnalités",
         description: v.description || "",
         videoUrl: `${req.protocol}://${req.get("host")}/videos/${v.filename}`,
@@ -73,9 +74,12 @@ app.post("/api/upload", upload.single("video"),async (req, res) => {
         const durationInSeconds = await getVideoDurationInSeconds(videoPath);
         const duration = formatDuration(durationInSeconds);
 
+        console.log(req)
+
         const newVideo = {
             id: uuidv4(),
             filename: req.file.filename,
+            title : req.body.title || req.file.filename,
             url: `${req.protocol}://${req.get("host")}/videos/${req.file.filename}`,
             description: req.body.description || "",
             duration,
@@ -118,6 +122,7 @@ app.put("/api/videos/:id", (req, res) => {
     if (!video) return res.status(404).json({ error: "Vidéo non trouvée" });
 
     video.description = req.body.description || video.description;
+    video.title = req.body.title || video.title;
     writeMetadata(metadata);
     res.json({ message: "Description mise à jour", video });
 });

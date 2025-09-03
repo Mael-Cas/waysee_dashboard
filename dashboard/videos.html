@@ -43,6 +43,7 @@
     <div class="card">
         <h3>Ajouter une vidéo</h3>
         <input type="file" id="videoFile" class="input" />
+        <input type="text" id="videoTitle" class="input" placeholder="Titre (optionnelle)" />
         <input type="text" id="videoDesc" class="input" placeholder="Description (optionnelle)" />
         <button class="btn btn-primary" onclick="uploadVideo()">Uploader</button>
     </div>
@@ -78,7 +79,7 @@
                 <a class="link" href="${v.videoUrl}" target="_blank">Ouvrir la vidéo</a>
             </div>
             <div class="video-actions">
-                <button class="btn btn-secondary" onclick="editDescription('${v.id}')">Modifier</button>
+                <button class="btn btn-secondary" onclick="editVideo('${v.id}')">Modifier</button>
                 <button class="btn btn-danger" onclick="deleteVideo('${v.id}')">Supprimer</button>
             </div>
         `;
@@ -89,11 +90,13 @@
     async function uploadVideo(){
         const file = document.getElementById('videoFile').files[0];
         const description = document.getElementById('videoDesc').value;
+        const title = document.getElementById('videoTitle').value;
         if(!file){ alert('Veuillez sélectionner un fichier'); return; }
 
         const formData = new FormData();
         formData.append('video', file);
         formData.append('description', description);
+        formData.append('title', title);
 
         const res = await fetch(API_BASE + '/api/upload', {
             method: 'POST',
@@ -104,6 +107,7 @@
             alert('Vidéo uploadée');
             document.getElementById('videoFile').value = '';
             document.getElementById('videoDesc').value = '';
+            document.getElementById('videoTitle').value = '';
             loadVideos();
         } else {
             alert('Erreur upload');
@@ -121,19 +125,47 @@
         }
     }
 
-    async function editDescription(id){
-        const newDesc = prompt('Nouvelle description :');
-        if(newDesc === null) return;
+    async function editVideo(id) {
+        const newTitle = prompt('Nouveau titre (laisser vide pour ne pas changer)');
+        const newDesc = prompt('Nouvelle description (laisser vide pour ne pas changer)');
+
+        if ((newTitle === null || newTitle.trim() === '') && (newDesc === null || newDesc.trim() === '')) {
+            alert('Aucune modification');
+            return;
+        }
+
+        const payload = {};
+        if (newTitle && newTitle.trim() !== '') payload.title = newTitle.trim();
+        if (newDesc && newDesc.trim() !== '') payload.description = newDesc.trim();
+
         const res = await fetch(API_BASE + '/api/videos/' + id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ description: newDesc })
+            body: JSON.stringify(payload)
         });
-        if(res.ok){
-            alert('Description mise à jour');
+
+        if (res.ok) {
+            alert('Vidéo mise à jour');
             loadVideos();
         } else {
             alert('Erreur mise à jour');
+        }
+    }
+
+
+    async function editTitle(id){
+        const newTitle = prompt('Nouvelle titre :');
+        if(newTitle === null) return;
+        const res = await fetch(API_BASE + '/api/videos/' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: newTitle })
+        });
+        if(res.ok){
+            alert('Titre mise à jour');
+            loadVideos();
+        } else {
+            alert('Erreur titre');
         }
     }
 
