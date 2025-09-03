@@ -5,9 +5,10 @@ import fs from "fs";
 import path from "path";
 import bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
+import {getVideoDurationInSeconds} from "get-video-duration";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 
 // Middleware
 app.use(cors());
@@ -34,27 +35,61 @@ const readMetadata = () => JSON.parse(fs.readFileSync(METADATA_FILE));
 const writeMetadata = (data) => fs.writeFileSync(METADATA_FILE, JSON.stringify(data, null, 2));
 
 /**
+ * Convertit la durée en secondes vers format mm:ss
+ */
+function formatDuration(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+}
+
+/**
  * Route: Lister toutes les vidéos
  */
 app.get("/api/videos", (req, res) => {
     const metadata = readMetadata();
-    res.json(metadata);
+
+    const formattedVideos = metadata.map((v, index) => ({
+        id: v.id,
+        title: path.parse(v.filename).name, // nom du fichier sans extension
+        subtitle: v.subtitle || "Découvrez nos fonctionnalités",
+        description: v.description || "",
+        videoUrl: `${req.protocol}://${req.get("host")}/videos/${v.filename}`,
+        duration: v.duration || "00:00",
+        progress: v.progress || 0
+    }));
+
+    res.json(formattedVideos);
 });
 
 /**
  * Route: Upload une vidéo
  */
-app.post("/api/upload", upload.single("video"), (req, res) => {
+app.post("/api/upload", upload.single("video"),async (req, res) => {
     const metadata = readMetadata();
-    const newVideo = {
-        id: uuidv4(),
-        filename: req.file.filename,
-        url: `${req.protocol}://${req.get("host")}/videos/${req.file.filename}`,
-        description: req.body.description || ""
-    };
-    metadata.push(newVideo);
-    writeMetadata(metadata);
-    res.json({ message: "Vidéo uploadée avec succès", video: newVideo });
+    const videoPath = path.join(VIDEO_DIR, req.file.filename);
+
+    try {
+        const durationInSeconds = await getVideoDurationInSeconds(videoPath);
+        const duration = formatDuration(durationInSeconds);
+
+        const newVideo = {
+            id: uuidv4(),
+            filename: req.file.filename,
+            url: `${req.protocol}://${req.get("host")}/videos/${req.file.filename}`,
+            description: req.body.description || "",
+            duration,
+            progress: 0
+        };
+
+        metadata.push(newVideo);
+        writeMetadata(metadata);
+
+        res.json({ message: "Vidéo uploadée avec succès", video: newVideo });
+    } catch (err) {
+        console.error("Erreur calcul durée:", err);
+        res.status(500).json({ error: "Impossible de lire la durée de la vidéo" });
+    }
 });
 
 /**
@@ -62,6 +97,7 @@ app.post("/api/upload", upload.single("video"), (req, res) => {
  */
 app.delete("/api/videos/:id", (req, res) => {
     const metadata = readMetadata();
+    console.log(metadata);
     const index = metadata.findIndex((v) => v.id === req.params.id);
     if (index === -1) return res.status(404).json({ error: "Vidéo non trouvée" });
 

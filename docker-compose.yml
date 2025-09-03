@@ -9,7 +9,7 @@ services:
       - ./videos:/app/videos
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "4000:4000"
 
   # Dashboard + Reverse Proxy NGINX
   nginx:
